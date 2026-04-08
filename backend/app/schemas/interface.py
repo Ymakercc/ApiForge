@@ -59,3 +59,45 @@ class InterfaceListResponse(BaseModel):
     page: int
     page_size: int
     items: list[InterfaceResponse]
+
+
+class InterfaceDebugResponse(BaseModel):
+    success: bool
+    status_code: int | None
+    duration_ms: int
+    data: Any | None
+    error_message: str | None
+
+
+class InterfaceDebugRequest(BaseModel):
+    headers: dict[str, Any] | None = None
+    params: dict[str, Any] | None = None
+    body: dict[str, Any] | None = None
+
+
+class InterfaceTestCaseCreate(BaseModel):
+    name: str
+    description: str | None = None
+    request_headers: dict[str, Any] | None = None
+    request_params: dict[str, Any] | None = None
+    request_body: dict[str, Any] | None = None
+    expected_status: int | None = None
+    expected_keywords: str | None = None
+    remark: str | None = None
+
+
+class InterfaceTestCaseResponse(BaseModel):
+    id: int
+    interface_id: int
+    name: str
+    description: str | None
+    request_headers: dict[str, Any] | None
+    request_params: dict[str, Any] | None
+    request_body: dict[str, Any] | None
+    expected_status: int | None
+    expected_keywords: str | None
+    remark: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

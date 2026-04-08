@@ -6,9 +6,13 @@ from app.core.deps import get_current_user
 from app.models.user import User
 from app.schemas.interface import (
     InterfaceCreate,
+    InterfaceDebugRequest,
+    InterfaceDebugResponse,
     InterfaceListResponse,
     InterfaceResponse,
     InterfaceStatusUpdate,
+    InterfaceTestCaseCreate,
+    InterfaceTestCaseResponse,
     InterfaceUpdate,
 )
 from app.services import interface_service
@@ -83,3 +87,50 @@ def update_status(
 ):
     interface = _get_or_404(db, interface_id)
     return interface_service.update_status(db, interface, data.is_enabled)
+
+
+@router.post("/{interface_id}/debug", response_model=InterfaceDebugResponse)
+def debug_interface(
+    interface_id: int,
+    data: InterfaceDebugRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    interface = _get_or_404(db, interface_id)
+    payload = data or InterfaceDebugRequest()
+    result = interface_service.debug_interface(
+        db,
+        interface,
+        triggered_by=current_user.id,
+        headers=payload.headers,
+        params=payload.params,
+        body=payload.body,
+    )
+    return InterfaceDebugResponse(
+        success=result.success,
+        status_code=result.status_code,
+        duration_ms=result.duration_ms,
+        data=result.data,
+        error_message=result.error_message,
+    )
+
+
+@router.get("/{interface_id}/test-cases", response_model=list[InterfaceTestCaseResponse])
+def list_test_cases(
+    interface_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    interface = _get_or_404(db, interface_id)
+    return interface_service.get_interface_test_cases(db, interface.id)
+
+
+@router.post("/{interface_id}/test-cases", response_model=InterfaceTestCaseResponse, status_code=status.HTTP_201_CREATED)
+def create_test_case(
+    interface_id: int,
+    data: InterfaceTestCaseCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    interface = _get_or_404(db, interface_id)
+    return interface_service.create_test_case(db, interface, data)

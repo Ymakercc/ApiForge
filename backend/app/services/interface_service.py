@@ -1,8 +1,29 @@
 from sqlalchemy import or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.interface import Interface
-from app.schemas.interface import InterfaceCreate, InterfaceUpdate
+from app.models.interface_log import InterfaceLog
+from app.models.interface_test_case import InterfaceTestCase
+from app.schemas.interface import InterfaceCreate, InterfaceTestCaseCreate, InterfaceUpdate
+from app.utils.request_executor import execute_http_request
+
+ERROR_MESSAGE_MAX_LENGTH = 512
+RESPONSE_BODY_MAX_LENGTH = 60000
+
+
+def _truncate_error_message(message: str | None) -> str | None:
+    if not message:
+        return None
+
+    return message[:ERROR_MESSAGE_MAX_LENGTH]
+
+
+def _truncate_response_body(body: str | None) -> str | None:
+    if body is None:
+        return None
+
+    return body[:RESPONSE_BODY_MAX_LENGTH]
 
 
 def get_interfaces(
@@ -52,3 +73,68 @@ def update_status(db: Session, interface: Interface, is_enabled: int) -> Interfa
     db.commit()
     db.refresh(interface)
     return interface
+
+
+def debug_interface(
+    db: Session,
+    interface: Interface,
+    triggered_by: int | None = None,
+    headers: dict | None = None,
+    params: dict | None = None,
+    body: dict | None = None,
+):
+    request_headers = interface.headers if headers is None else headers
+    request_params = interface.params if params is None else params
+    request_body = interface.body if body is None else body
+
+    result = execute_http_request(
+        method=interface.method,
+        url=interface.url,
+        headers=request_headers,
+        params=request_params,
+        json_body=request_body,
+        auth_type=interface.auth_type,
+        auth_config=interface.auth_config,
+    )
+
+    log = InterfaceLog(
+        interface_id=interface.id,
+        request_method=interface.method,
+        request_url=result.request_url,
+        request_headers=result.request_headers,
+        request_body=request_body,
+        response_status=result.status_code,
+        response_body=_truncate_response_body(result.response_body),
+        response_time_ms=result.duration_ms,
+        is_success=1 if result.success else 0,
+        error_message=_truncate_error_message(result.error_message),
+        triggered_by=triggered_by,
+    )
+    db.add(log)
+
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+
+    return result
+
+
+def create_test_case(db: Session, interface: Interface, data: InterfaceTestCaseCreate) -> InterfaceTestCase:
+    test_case = InterfaceTestCase(
+        interface_id=interface.id,
+        **data.model_dump(),
+    )
+    db.add(test_case)
+    db.commit()
+    db.refresh(test_case)
+    return test_case
+
+
+def get_interface_test_cases(db: Session, interface_id: int) -> list[InterfaceTestCase]:
+    return (
+        db.query(InterfaceTestCase)
+        .filter(InterfaceTestCase.interface_id == interface_id)
+        .order_by(InterfaceTestCase.updated_at.desc(), InterfaceTestCase.id.desc())
+        .all()
+    )

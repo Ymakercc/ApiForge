@@ -1,16 +1,20 @@
 import { del, get, patch, post, put } from '@/utils/request'
 
+export interface JsonObject {
+  [key: string]: any
+}
+
 export interface InterfaceItem {
   id: number
   name: string
   description: string | null
   method: string
   url: string
-  headers: Record<string, any> | null
-  params: Record<string, any> | null
-  body: Record<string, any> | null
+  headers: JsonObject | null
+  params: JsonObject | null
+  body: JsonObject | null
   auth_type: string
-  auth_config: Record<string, any> | null
+  auth_config: JsonObject | null
   category: string | null
   is_enabled: number
   created_by: number | null
@@ -36,9 +40,53 @@ export interface InterfaceFormData {
   description?: string | null
   method: string
   url: string
+  headers?: JsonObject | null
+  params?: JsonObject | null
+  body?: JsonObject | null
   category?: string | null
   auth_type?: string
+  auth_config?: JsonObject | null
   is_enabled?: number
+}
+
+export interface InterfaceDebugPayload {
+  headers?: JsonObject | null
+  params?: JsonObject | null
+  body?: JsonObject | null
+}
+
+export interface InterfaceDebugResponse {
+  success: boolean
+  status_code: number | null
+  duration_ms: number
+  data: any
+  error_message: string | null
+}
+
+export interface InterfaceTestCasePayload {
+  name: string
+  description?: string | null
+  request_headers?: JsonObject | null
+  request_params?: JsonObject | null
+  request_body?: JsonObject | null
+  expected_status?: number | null
+  expected_keywords?: string | null
+  remark?: string | null
+}
+
+export interface InterfaceTestCaseItem {
+  id: number
+  interface_id: number
+  name: string
+  description: string | null
+  request_headers: JsonObject | null
+  request_params: JsonObject | null
+  request_body: JsonObject | null
+  expected_status: number | null
+  expected_keywords: string | null
+  remark: string | null
+  created_at: string
+  updated_at: string
 }
 
 export function getInterfaceListApi(params: InterfaceListParams) {
@@ -65,4 +113,16 @@ export function updateInterfaceStatusApi(interfaceId: number, isEnabled: number)
   return patch<InterfaceItem>(`/api/v1/interfaces/${interfaceId}/status`, {
     is_enabled: isEnabled,
   })
+}
+
+export function debugInterfaceApi(interfaceId: number, data: InterfaceDebugPayload) {
+  return post<InterfaceDebugResponse>(`/api/v1/interfaces/${interfaceId}/debug`, data)
+}
+
+export function getInterfaceTestCasesApi(interfaceId: number) {
+  return get<InterfaceTestCaseItem[]>(`/api/v1/interfaces/${interfaceId}/test-cases`)
+}
+
+export function createInterfaceTestCaseApi(interfaceId: number, data: InterfaceTestCasePayload) {
+  return post<InterfaceTestCaseItem>(`/api/v1/interfaces/${interfaceId}/test-cases`, data)
 }
